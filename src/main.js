@@ -103,18 +103,31 @@ const initToggleCards = (root, selector) => {
     (card) => !card.closest('[data-select="multi"]')
   )
   if (!cards.length) return
+  const getValue = (card) =>
+    card.dataset.answerValue ||
+    card.dataset.value ||
+    card.getAttribute('aria-label') ||
+    card.querySelector('.option-label')?.textContent?.trim()
   const sync = (card) => {
     const key =
       card.dataset.answerKey ||
       card.closest('[data-answer-key]')?.dataset.answerKey
     if (!key) return
-    const value =
-      card.dataset.answerValue ||
-      card.dataset.value ||
-      card.querySelector('.option-label')?.textContent?.trim()
+    const value = getValue(card)
     if (!value) return
     answers[key] = value
     sessionStorage.setItem(storageKey, JSON.stringify(answers))
+  }
+  const firstKey =
+    cards[0]?.dataset.answerKey ||
+    cards[0]?.closest('[data-answer-key]')?.dataset.answerKey
+  if (firstKey && answers[firstKey]) {
+    const targetValue = String(answers[firstKey]).trim()
+    const match = cards.find((card) => String(getValue(card)).trim() === targetValue)
+    if (match) {
+      cards.forEach((item) => item.classList.remove('is-active'))
+      match.classList.add('is-active')
+    }
   }
   cards.forEach((card) => {
     card.addEventListener('click', () => {
@@ -136,6 +149,18 @@ const initMultiCards = (root) => {
     const cards = [...list.querySelectorAll('.option-card')]
     if (!cards.length) return
     const key = list.dataset.answerKey
+    if (key && Array.isArray(answers[key])) {
+      const selected = answers[key].map((value) => String(value).trim())
+      cards.forEach((card) => {
+        const value =
+          card.dataset.answerValue ||
+          card.dataset.value ||
+          card.querySelector('.option-label')?.textContent?.trim()
+        if (value && selected.includes(String(value).trim())) {
+          card.classList.add('is-active')
+        }
+      })
+    }
     const sync = () => {
       if (!key) return
       const values = cards
