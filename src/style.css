@@ -1322,6 +1322,14 @@ main {
   color: #b02a1a;
 }
 
+.pay-status a {
+  display: inline-flex;
+  margin-top: 6px;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .input-card {
   background: var(--surface);
   border-radius: 18px;

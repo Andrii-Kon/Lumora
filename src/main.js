@@ -247,7 +247,7 @@ const initPaywall = (root) => {
     button.classList.add('is-processing')
   }
 
-  const setPaid = (button) => {
+  const setPaid = (button, actionLink) => {
     payButtons.forEach((item) => {
       item.disabled = true
       item.classList.remove('is-processing')
@@ -255,7 +255,19 @@ const initPaywall = (root) => {
     button.classList.add('is-paid')
     button.textContent = 'Paid'
     status.classList.remove('is-error')
-    status.textContent = 'Payment successful. Check your email for access.'
+    status.innerHTML = ''
+    if (actionLink) {
+      const label = document.createElement('div')
+      label.textContent = 'Dev mode: open your login link'
+      const link = document.createElement('a')
+      link.href = actionLink
+      link.textContent = 'Open magic link'
+      link.target = '_blank'
+      link.rel = 'noopener'
+      status.append(label, link)
+    } else {
+      status.textContent = 'Payment successful. Check your email for access.'
+    }
     status.hidden = false
   }
 
@@ -287,7 +299,13 @@ const initPaywall = (root) => {
         }
         return { ok: false, message: errorMessage }
       }
-      return { ok: true }
+      let data = {}
+      try {
+        data = await response.json()
+      } catch {
+        data = {}
+      }
+      return { ok: true, actionLink: data.action_link }
     } catch (error) {
       return { ok: false, message: 'Network error. Please try again.' }
     }
@@ -311,7 +329,7 @@ const initPaywall = (root) => {
           status.hidden = false
           return
         }
-        setPaid(button)
+        setPaid(button, result.actionLink)
       }, 1400)
     })
   })
