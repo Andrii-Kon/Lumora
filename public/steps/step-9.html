@@ -1,0 +1,45 @@
+<section class="step-page">
+  <header class="site-header step-header">
+    <button class="nav-back" type="button" data-prev-step="step-8" aria-label="Go back">
+      <span aria-hidden="true">←</span>
+    </button>
+    <div class="brand">Lumora</div>
+    <div class="header-spacer" aria-hidden="true"></div>
+  </header>
+  <div class="progress-track" aria-hidden="true">
+    <span class="progress-fill" style="width: 39%"></span>
+  </div>
+
+  <main class="step-shell">
+    <div class="step-content">
+      <section class="form-step">
+        <div class="section-heading" data-animate>
+          <h2>What is your date of birth?</h2>
+          <p>Your birth date helps us tailor the personality profile.</p>
+        </div>
+        <div class="input-card" data-animate>
+          <label class="field-label" for="birth-date">Birth date</label>
+          <input
+            class="field-input"
+            id="birth-date"
+            name="birth-date"
+            type="date"
+            autocomplete="bday"
+            data-answer-key="birthDate"
+            data-max-today="true"
+            required
+          />
+        </div>
+        <button
+          class="primary-button step-cta"
+          type="button"
+          data-next-step="step-10"
+          data-requires-input="#birth-date"
+          disabled
+        >
+          Continue
+        </button>
+      </section>
+    </div>
+  </main>
+</section>
