@@ -247,7 +247,8 @@ const initPaywall = (root) => {
     button.classList.add('is-processing')
   }
 
-  const setPaid = (button, actionLink) => {
+  const setPaid = (button, payload = {}) => {
+    const { actionLink, devPassword, devEmail } = payload
     payButtons.forEach((item) => {
       item.disabled = true
       item.classList.remove('is-processing')
@@ -256,7 +257,26 @@ const initPaywall = (root) => {
     button.textContent = 'Paid'
     status.classList.remove('is-error')
     status.innerHTML = ''
-    if (actionLink) {
+    if (devPassword) {
+      const label = document.createElement('div')
+      label.textContent = 'Dev mode: use these credentials'
+      const creds = document.createElement('div')
+      creds.className = 'dev-credentials'
+      const emailRow = document.createElement('div')
+      const emailLabel = document.createElement('span')
+      emailLabel.textContent = 'Email: '
+      const emailValue = document.createElement('code')
+      emailValue.textContent = devEmail || ''
+      emailRow.append(emailLabel, emailValue)
+      const passwordRow = document.createElement('div')
+      const passwordLabel = document.createElement('span')
+      passwordLabel.textContent = 'Password: '
+      const passwordValue = document.createElement('code')
+      passwordValue.textContent = devPassword
+      passwordRow.append(passwordLabel, passwordValue)
+      creds.append(emailRow, passwordRow)
+      status.append(label, creds)
+    } else if (actionLink) {
       const label = document.createElement('div')
       label.textContent = 'Dev mode: open your login link'
       const link = document.createElement('a')
@@ -305,7 +325,12 @@ const initPaywall = (root) => {
       } catch {
         data = {}
       }
-      return { ok: true, actionLink: data.action_link }
+      return {
+        ok: true,
+        actionLink: data.action_link,
+        devPassword: data.dev_password,
+        devEmail: data.dev_email,
+      }
     } catch (error) {
       return { ok: false, message: 'Network error. Please try again.' }
     }
@@ -329,7 +354,7 @@ const initPaywall = (root) => {
           status.hidden = false
           return
         }
-        setPaid(button, result.actionLink)
+        setPaid(button, result)
       }, 1400)
     })
   })
