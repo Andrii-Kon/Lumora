@@ -84,7 +84,9 @@ const initLottie = (root) => {
   destroyLotties()
   const hero = root.querySelector('#soulmateAnimation')
   if (hero) {
-    loadLottie(hero, '/animations/couple-in-love.json')
+    if (hero.tagName !== 'VIDEO') {
+      loadLottie(hero, '/animations/couple-in-love.json')
+    }
   }
   const decision = root.querySelector('[data-decision-animation]')
   if (decision) {
