@@ -351,17 +351,11 @@ main {
   border-radius: 16px;
   object-fit: cover;
   filter: blur(0);
-  animation: heroVideoBlur 2.8s ease forwards;
-  animation-delay: 5s;
+  transition: filter 1.6s ease;
 }
 
-@keyframes heroVideoBlur {
-  from {
-    filter: blur(0);
-  }
-  to {
-    filter: blur(8px);
-  }
+.hero-video.is-blurred {
+  filter: blur(8px);
 }
 
 .card-caption {

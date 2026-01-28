@@ -80,11 +80,25 @@ const loadLottie = (container, path) => {
   lottieInstances.push(instance)
 }
 
+const initHeroVideo = (video) => {
+  if (!video || video.tagName !== 'VIDEO') return
+  video.classList.remove('is-blurred')
+  const onTimeUpdate = () => {
+    if (video.currentTime >= 5) {
+      video.classList.add('is-blurred')
+      video.removeEventListener('timeupdate', onTimeUpdate)
+    }
+  }
+  video.addEventListener('timeupdate', onTimeUpdate)
+}
+
 const initLottie = (root) => {
   destroyLotties()
   const hero = root.querySelector('#soulmateAnimation')
   if (hero) {
-    if (hero.tagName !== 'VIDEO') {
+    if (hero.tagName === 'VIDEO') {
+      initHeroVideo(hero)
+    } else {
       loadLottie(hero, '/animations/couple-in-love.json')
     }
   }
