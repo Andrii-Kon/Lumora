@@ -740,13 +740,19 @@ main {
 }
 
 .access-step {
-  max-width: 760px;
+  width: min(100%, 920px);
   margin: 0 auto;
   display: grid;
   gap: 24px;
+  justify-items: center;
 }
 
 .access-heading {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
   text-align: center;
 }
 
@@ -762,10 +768,19 @@ main {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin-bottom: 14px;
+}
+
+.access-heading h2 {
+  margin-bottom: 0;
+}
+
+.access-heading p {
+  max-width: 34rem;
+  margin: 0 auto;
 }
 
 .access-card {
+  width: 100%;
   background: var(--surface);
   border-radius: 28px;
   padding: 28px;
@@ -853,19 +868,6 @@ main {
   place-items: center;
   font-weight: 700;
   flex-shrink: 0;
-}
-
-.access-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.access-action-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
 }
 
 .access-fallback {

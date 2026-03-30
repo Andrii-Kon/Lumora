@@ -478,8 +478,9 @@ def _send_portal_magic_link(email: str) -> dict:
             }
         except (AuthApiError, AuthError, Exception) as exc:
             otp_error = exc
-            if PORTAL_AUTH_DELIVERY == "email" and not supabase_admin_client:
-                raise RuntimeError(_get_error_message(exc, "Unable to send a secure portal email."))
+
+    if PORTAL_AUTH_DELIVERY == "email":
+        raise RuntimeError(_get_error_message(otp_error, "Unable to send a secure portal email."))
 
     if supabase_admin_client:
         try:

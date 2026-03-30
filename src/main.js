@@ -521,8 +521,6 @@ const initPortalAccessStep = (root) => {
   const status = root.querySelector('[data-access-status]')
   const emailValue = root.querySelector('[data-access-email]')
   const summary = root.querySelector('[data-access-summary]')
-  const directLink = root.querySelector('[data-access-direct-link]')
-  const portalLink = root.querySelector('[data-access-portal-link]')
   const fallback = root.querySelector('[data-access-fallback]')
 
   const setStatus = (message, kind = 'info') => {
@@ -539,22 +537,16 @@ const initPortalAccessStep = (root) => {
     }
 
     if (deliveryMethod === 'direct_link' && actionLink) {
-      setStatus('Your secure access link is ready.', 'success')
+      setStatus('Your secure portal is ready. Opening it now...', 'success')
       if (summary) {
         summary.textContent =
-          'Open the one-time sign-in link below to enter your private portal and view your portrait.'
-      }
-      if (directLink) {
-        directLink.href = actionLink
-        directLink.hidden = false
-      }
-      if (portalLink && portalUrl) {
-        portalLink.href = portalUrl
-        portalLink.hidden = false
+          'We could not finish email delivery in time, so we are opening your private portal directly.'
       }
       if (fallback) {
-        fallback.textContent = 'This can happen if email delivery is delayed. Your access is still ready.'
+        fallback.textContent =
+          'If nothing opens, refresh this page and check your inbox again in a minute.'
       }
+      window.setTimeout(() => window.location.assign(actionLink), 900)
       return
     }
 
@@ -562,10 +554,6 @@ const initPortalAccessStep = (root) => {
     if (summary) {
       summary.textContent =
         'To view your portrait, open the email we just sent and tap the secure sign-in link inside.'
-    }
-    if (portalLink && portalUrl) {
-      portalLink.href = portalUrl
-      portalLink.hidden = false
     }
     if (fallback) {
       fallback.textContent = 'If you do not see it right away, check Spam, Promotions, or wait a minute and refresh your inbox.'
@@ -592,7 +580,7 @@ const initPortalAccessStep = (root) => {
     }
 
     const payload = readPortalAccess()
-    if (payload?.portalEmail || payload?.actionLink) {
+    if (payload?.portalEmail || payload?.deliveryMethod || payload?.actionLink) {
       clearCheckoutState('step-24')
       applyPayload(payload)
       return

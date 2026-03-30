@@ -456,6 +456,10 @@ async function sendPortalMagicLink(email) {
     otpError = error
   }
 
+  if (portalAuthDelivery === 'email') {
+    throw new Error(getErrorMessage(otpError, 'Unable to send a secure portal email.'))
+  }
+
   if (supabaseAdminClient) {
     const { data, error } = await supabaseAdminClient.auth.admin.generateLink({
       type: 'magiclink',
