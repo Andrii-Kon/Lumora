@@ -245,7 +245,7 @@ function resolveAppBaseUrl(request) {
 
 function buildReturnUrl(baseUrl, checkoutStatus) {
   const url = new URL(baseUrl || 'http://localhost:5173')
-  url.searchParams.set('step', 'step-23')
+  url.searchParams.set('step', checkoutStatus === 'success' ? 'step-24' : 'step-23')
   url.searchParams.set('checkout', checkoutStatus)
   const urlString = url.toString()
   if (checkoutStatus !== 'success') {

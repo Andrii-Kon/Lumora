@@ -12,7 +12,14 @@
       <span class="offer-tag">Sketch offer</span>
       <span class="offer-time" data-offer-time>Ends in 14:49</span>
     </div>
-    <button class="primary-button offer-cta" type="button">Continue</button>
+    <button
+      class="primary-button offer-cta"
+      type="button"
+      aria-controls="checkout-card"
+      onclick="document.getElementById('checkout-card')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })"
+    >
+      Continue
+    </button>
   </div>
 
   <div class="progress-track" aria-hidden="true">
@@ -38,7 +45,14 @@
               </span>
             </div>
           </div>
-          <button class="primary-button" type="button">Get My Soulmate Sketch</button>
+          <button
+            class="primary-button"
+            type="button"
+            aria-controls="checkout-card"
+            onclick="document.getElementById('checkout-card')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })"
+          >
+            Get My Soulmate Sketch
+          </button>
         </div>
 
         <div class="preview-visual" aria-hidden="true">
@@ -116,7 +130,7 @@
           </div>
         </section>
 
-        <section class="paywall-card checkout-card" data-animate>
+        <section class="paywall-card checkout-card" id="checkout-card" data-animate>
           <ul class="feature-list">
             <li>
               <span class="check-icon" aria-hidden="true">✓</span>

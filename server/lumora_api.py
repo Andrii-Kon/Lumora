@@ -267,7 +267,7 @@ def _resolve_app_base_url() -> str:
 def _build_return_url(base_url: str, checkout_status: str) -> str:
     parsed = urlparse(base_url or "http://localhost:5173")
     query = dict(parse_qsl(parsed.query, keep_blank_values=True))
-    query["step"] = "step-23"
+    query["step"] = "step-24" if checkout_status == "success" else "step-23"
     query["checkout"] = checkout_status
     rebuilt = urlunparse(
         (

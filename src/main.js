@@ -7,6 +7,7 @@ let offerTimerId = null
 let currentStepId = null
 const storageKey = 'lumoraAnswers'
 const offerTimerKey = 'lumoraOfferEndsAt'
+const portalAccessKey = 'lumoraPortalAccess'
 const answers = (() => {
   try {
     return JSON.parse(sessionStorage.getItem(storageKey) || '{}')
@@ -49,6 +50,7 @@ const steps = {
   'step-21': '/steps/step-21.html',
   'step-22': '/steps/step-22.html',
   'step-23': '/steps/step-23.html',
+  'step-24': '/steps/step-24.html',
 }
 
 const buildApiUrl = (path) => {
@@ -72,12 +74,86 @@ const getCheckoutState = () => {
   }
 }
 
-const clearCheckoutState = () => {
+const clearCheckoutState = (stepId = currentStepId) => {
   if (typeof window === 'undefined') return
   const url = new URL(window.location.href)
+  if (stepId && steps[stepId]) {
+    url.searchParams.set('step', stepId)
+  }
   url.searchParams.delete('checkout')
   url.searchParams.delete('session_id')
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
+const maskEmail = (value) => {
+  const email = String(value || '').trim()
+  const [localPart, domain] = email.split('@')
+  if (!localPart || !domain) return email
+  if (localPart.length <= 2) return `${localPart[0] || ''}***@${domain}`
+  return `${localPart.slice(0, 2)}***${localPart.slice(-1)}@${domain}`
+}
+
+const savePortalAccess = (payload = {}) => {
+  try {
+    sessionStorage.setItem(portalAccessKey, JSON.stringify(payload))
+  } catch {
+    // Ignore storage write issues.
+  }
+}
+
+const readPortalAccess = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(portalAccessKey) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+const getQuizPayload = () => {
+  const quiz = { ...answers }
+  delete quiz.email
+  return quiz
+}
+
+const completeCheckout = async (sessionId) => {
+  try {
+    const response = await fetch(buildApiUrl('/api/stripe/complete-checkout'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        quiz: getQuizPayload(),
+      }),
+    })
+
+    if (!response.ok) {
+      let errorMessage = 'Unable to confirm your payment.'
+      try {
+        const data = await response.json()
+        if (data?.message) errorMessage = data.message
+      } catch {
+        // ignore parsing errors
+      }
+      return { ok: false, message: errorMessage }
+    }
+
+    let data = {}
+    try {
+      data = await response.json()
+    } catch {
+      data = {}
+    }
+
+    return {
+      ok: true,
+      actionLink: data.actionLink,
+      deliveryMethod: data.deliveryMethod,
+      portalEmail: data.portalEmail,
+      portalUrl: data.portalUrl,
+    }
+  } catch (error) {
+    return { ok: false, message: 'Network error. Please try again.' }
+  }
 }
 
 const reveal = (root) => {
@@ -285,13 +361,6 @@ const initPaywall = (root) => {
   if (!payButtons.length) return
   const primaryButton = payButtons[0]
   const container = root.querySelector('.checkout-card') || root
-  const maskEmail = (value) => {
-    const email = String(value || '').trim()
-    const [localPart, domain] = email.split('@')
-    if (!localPart || !domain) return email
-    if (localPart.length <= 2) return `${localPart[0] || ''}***@${domain}`
-    return `${localPart.slice(0, 2)}***${localPart.slice(-1)}@${domain}`
-  }
   let status = container.querySelector('[data-pay-status]')
   if (!status) {
     status = document.createElement('div')
@@ -327,59 +396,20 @@ const initPaywall = (root) => {
     button.classList.add('is-processing')
   }
 
-  const setPaid = (button, payload = {}) => {
-    const { actionLink, deliveryMethod, portalEmail, portalUrl } = payload
+  const routeToAccessStep = async (payload = {}) => {
+    savePortalAccess(payload)
+    clearCheckoutState('step-24')
+    await loadStep('step-24')
+  }
+
+  const setPaid = async (button, payload = {}) => {
     payButtons.forEach((item) => {
       item.disabled = true
       item.classList.remove('is-processing')
     })
     button.classList.add('is-paid')
     button.textContent = 'Paid'
-    status.classList.remove('is-error')
-    status.innerHTML = ''
-    if (deliveryMethod === 'direct_link' && actionLink) {
-      const label = document.createElement('div')
-      label.textContent = 'Your secure portal link is ready.'
-      const note = document.createElement('div')
-      note.className = 'access-details'
-      note.textContent = portalEmail
-        ? `Email: ${maskEmail(portalEmail)}`
-        : 'Use this one-time sign-in link to enter your portal.'
-      const link = document.createElement('a')
-      link.href = actionLink
-      link.textContent = 'Open secure access link'
-      link.target = '_blank'
-      link.rel = 'noopener'
-      status.append(label, note, link)
-    } else if (portalEmail) {
-      const label = document.createElement('div')
-      label.textContent = 'We sent your secure sign-in link.'
-      const emailLine = document.createElement('div')
-      emailLine.className = 'access-details'
-      const emailValue = document.createElement('code')
-      emailValue.textContent = maskEmail(portalEmail)
-      emailLine.append('Inbox: ', emailValue)
-      status.append(label, emailLine)
-      if (portalUrl) {
-        const hint = document.createElement('div')
-        hint.textContent = 'After opening the email, you will land in your private portal.'
-        const portalLink = document.createElement('a')
-        portalLink.href = portalUrl
-        portalLink.textContent = 'Open portal'
-        portalLink.target = '_blank'
-        portalLink.rel = 'noopener'
-        status.append(hint, portalLink)
-      }
-    } else {
-      status.textContent = 'Payment successful. Check your email for access.'
-    }
-    status.hidden = false
-  }
-
-  const getQuizPayload = () => {
-    const quiz = { ...answers }
-    delete quiz.email
-    return quiz
+    await routeToAccessStep(payload)
   }
 
   const startCheckout = async () => {
@@ -423,47 +453,6 @@ const initPaywall = (root) => {
     }
   }
 
-  const completeCheckout = async (sessionId) => {
-    try {
-      const response = await fetch(buildApiUrl('/api/stripe/complete-checkout'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          quiz: getQuizPayload(),
-        }),
-      })
-
-      if (!response.ok) {
-        let errorMessage = 'Unable to confirm your payment.'
-        try {
-          const data = await response.json()
-          if (data?.message) errorMessage = data.message
-        } catch {
-          // ignore parsing errors
-        }
-        return { ok: false, message: errorMessage }
-      }
-
-      let data = {}
-      try {
-        data = await response.json()
-      } catch {
-        data = {}
-      }
-
-      return {
-        ok: true,
-        actionLink: data.actionLink,
-        deliveryMethod: data.deliveryMethod,
-        portalEmail: data.portalEmail,
-        portalUrl: data.portalUrl,
-      }
-    } catch (error) {
-      return { ok: false, message: 'Network error. Please try again.' }
-    }
-  }
-
   const restoreCheckoutState = async () => {
     const { status: checkoutStatus, sessionId } = getCheckoutState()
 
@@ -499,8 +488,7 @@ const initPaywall = (root) => {
       return
     }
 
-    setPaid(primaryButton, result)
-    clearCheckoutState()
+    await setPaid(primaryButton, result)
   }
 
   payButtons.forEach((button) => {
@@ -525,6 +513,102 @@ const initPaywall = (root) => {
   })
 
   restoreCheckoutState()
+}
+
+const initPortalAccessStep = (root) => {
+  if (!root.querySelector('[data-access-step]')) return
+
+  const status = root.querySelector('[data-access-status]')
+  const emailValue = root.querySelector('[data-access-email]')
+  const summary = root.querySelector('[data-access-summary]')
+  const directLink = root.querySelector('[data-access-direct-link]')
+  const portalLink = root.querySelector('[data-access-portal-link]')
+  const fallback = root.querySelector('[data-access-fallback]')
+
+  const setStatus = (message, kind = 'info') => {
+    if (!status) return
+    status.textContent = message
+    status.dataset.state = kind
+  }
+
+  const applyPayload = (payload = {}) => {
+    const { actionLink, deliveryMethod, portalEmail, portalUrl } = payload
+
+    if (emailValue) {
+      emailValue.textContent = maskEmail(portalEmail || answers.email || 'your email')
+    }
+
+    if (deliveryMethod === 'direct_link' && actionLink) {
+      setStatus('Your secure access link is ready.', 'success')
+      if (summary) {
+        summary.textContent =
+          'Open the one-time sign-in link below to enter your private portal and view your portrait.'
+      }
+      if (directLink) {
+        directLink.href = actionLink
+        directLink.hidden = false
+      }
+      if (portalLink && portalUrl) {
+        portalLink.href = portalUrl
+        portalLink.hidden = false
+      }
+      if (fallback) {
+        fallback.textContent = 'This can happen if email delivery is delayed. Your access is still ready.'
+      }
+      return
+    }
+
+    setStatus('We sent your secure sign-in link to your email.', 'success')
+    if (summary) {
+      summary.textContent =
+        'To view your portrait, open the email we just sent and tap the secure sign-in link inside.'
+    }
+    if (portalLink && portalUrl) {
+      portalLink.href = portalUrl
+      portalLink.hidden = false
+    }
+    if (fallback) {
+      fallback.textContent = 'If you do not see it right away, check Spam, Promotions, or wait a minute and refresh your inbox.'
+    }
+  }
+
+  const restorePortalAccess = async () => {
+    const { status: checkoutStatus, sessionId } = getCheckoutState()
+
+    if (checkoutStatus === 'success' && sessionId) {
+      setStatus('Payment confirmed. Preparing your secure portal access...', 'loading')
+      const result = await completeCheckout(sessionId)
+      if (!result.ok) {
+        setStatus(result.message || 'Unable to finish your access right now.', 'error')
+        if (summary) {
+          summary.textContent = 'Please refresh this page or contact support if the issue continues.'
+        }
+        return
+      }
+      savePortalAccess(result)
+      clearCheckoutState('step-24')
+      applyPayload(result)
+      return
+    }
+
+    const payload = readPortalAccess()
+    if (payload?.portalEmail || payload?.actionLink) {
+      clearCheckoutState('step-24')
+      applyPayload(payload)
+      return
+    }
+
+    setStatus('Your payment is complete.', 'success')
+    if (summary) {
+      summary.textContent =
+        'Use the secure sign-in link sent to your email to open your private portal and see your portrait.'
+    }
+    if (emailValue) {
+      emailValue.textContent = maskEmail(answers.email || 'your email')
+    }
+  }
+
+  restorePortalAccess()
 }
 
 const initFlow = (root) => {
@@ -784,6 +868,7 @@ const loadStep = async (stepId) => {
     initMultiCards(root)
     initRequiredSelections(root)
     initPaywall(root)
+    initPortalAccessStep(root)
     initFlow(root)
     initFaqAccordion(root)
     initDateInputs(root)

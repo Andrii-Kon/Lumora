@@ -735,6 +735,144 @@ main {
   width: 100%;
 }
 
+.access-page .step-shell {
+  align-items: flex-start;
+}
+
+.access-step {
+  max-width: 760px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+.access-heading {
+  text-align: center;
+}
+
+.access-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(47, 157, 102, 0.12);
+  color: #1f6c47;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.access-card {
+  background: var(--surface);
+  border-radius: 28px;
+  padding: 28px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 18px;
+}
+
+.access-status {
+  padding: 14px 16px;
+  border-radius: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.access-status[data-state="loading"] {
+  background: rgba(10, 110, 209, 0.1);
+  color: #0a6ed1;
+}
+
+.access-status[data-state="success"] {
+  background: rgba(47, 157, 102, 0.12);
+  color: #1f6c47;
+}
+
+.access-status[data-state="error"] {
+  background: rgba(196, 57, 41, 0.12);
+  color: #b43828;
+}
+
+.access-email-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: #f7f1fb;
+}
+
+.access-email-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(75, 45, 138, 0.75);
+}
+
+.access-email-card code {
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(111, 53, 199, 0.12);
+  color: #4b2d8a;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.access-steps {
+  display: grid;
+  gap: 12px;
+}
+
+.access-step-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(26, 26, 31, 0.035);
+}
+
+.access-step-item p {
+  margin: 0;
+}
+
+.access-step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(10, 110, 209, 0.12);
+  color: #0a6ed1;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.access-action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.access-fallback {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .perk-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
