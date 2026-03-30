@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
+import { randomBytes } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
@@ -302,9 +303,9 @@ async function fulfillCheckoutSession(sessionId, fallbackQuiz = {}) {
     const draft = checkoutDrafts.get(sessionId)
     const quiz =
       Object.keys(fallbackQuiz || {}).length > 0 ? fallbackQuiz : sanitizeQuiz(draft?.quiz || {})
-    const userExistedBeforeHandoff = await portalUserExists(email)
+    const portalUserReady = await ensurePortalUser(email)
     await handoffPortalAccess(email, quiz)
-    const portalAccess = await resolvePortalAccess(email, userExistedBeforeHandoff)
+    const portalAccess = await resolvePortalAccess(email, portalUserReady)
 
     const result = {
       actionLink: portalAccess.actionLink,
@@ -367,10 +368,44 @@ async function handoffPortalAccess(email, quiz) {
   return data
 }
 
-async function resolvePortalAccess(email, userExistedBeforeHandoff) {
-  // The external portal sends an invite email for first-time users.
-  // Sending another Lumora magic link right after that invalidates the first OTP.
-  if (accessApiBase && !userExistedBeforeHandoff) {
+function generateTemporaryPassword() {
+  return `Lumora-${randomBytes(12).toString('base64url')}`
+}
+
+async function ensurePortalUser(email) {
+  const userExists = await portalUserExists(email)
+  if (userExists) {
+    return true
+  }
+
+  if (!supabaseAdminClient || !email) {
+    return false
+  }
+
+  const { error } = await supabaseAdminClient.auth.admin.createUser({
+    email,
+    password: generateTemporaryPassword(),
+    email_confirm: true,
+    user_metadata: {
+      source: 'lumora-web',
+    },
+  })
+
+  if (!error) {
+    return true
+  }
+
+  if (await portalUserExists(email)) {
+    return true
+  }
+
+  throw new Error(getErrorMessage(error, 'Unable to prepare portal access.'))
+}
+
+async function resolvePortalAccess(email, portalUserReady) {
+  // If we cannot ensure the user exists up front, fall back to the portal invite
+  // flow for brand-new users to avoid losing access entirely.
+  if (accessApiBase && !portalUserReady) {
     return {
       actionLink: null,
       deliveryMethod: 'email',

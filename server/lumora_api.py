@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import threading
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -351,9 +352,9 @@ def _fulfill_checkout_session(session_id: str, fallback_quiz: dict | None = None
 
         draft = checkout_drafts.get(session_id, {})
         quiz = fallback_quiz or _sanitize_quiz(draft.get("quiz"))
-        user_existed_before_handoff = _portal_user_exists(email)
+        portal_user_ready = _ensure_portal_user(email)
         _handoff_portal_access(email, quiz)
-        portal_access = _resolve_portal_access(email, user_existed_before_handoff)
+        portal_access = _resolve_portal_access(email, portal_user_ready)
 
         result = {
             "actionLink": portal_access["actionLink"],
@@ -404,11 +405,40 @@ def _handoff_portal_access(email: str, quiz: dict):
     return data
 
 
-def _resolve_portal_access(email: str, user_existed_before_handoff: bool) -> dict:
-    # The external portal handoff sends an invite email for brand-new users.
-    # Avoid sending a second magic-link email here, because Supabase invalidates
-    # the earlier OTP and the user lands on an expired-link error page.
-    if ACCESS_API_BASE and not user_existed_before_handoff:
+def _generate_temp_password() -> str:
+    return f"Lumora-{secrets.token_urlsafe(9)}"
+
+
+def _ensure_portal_user(email: str) -> bool:
+    user_exists = _portal_user_exists(email)
+    if user_exists:
+        return True
+
+    if not supabase_admin_client or not email:
+        return False
+
+    try:
+        supabase_admin_client.auth.admin.create_user(
+            {
+                "email": email,
+                "password": _generate_temp_password(),
+                "email_confirm": True,
+                "user_metadata": {
+                    "source": "lumora-web",
+                },
+            }
+        )
+        return True
+    except (AuthApiError, AuthError, Exception) as exc:
+        if _portal_user_exists(email):
+            return True
+        raise RuntimeError(_get_error_message(exc, "Unable to prepare portal access.")) from exc
+
+
+def _resolve_portal_access(email: str, portal_user_ready: bool) -> dict:
+    # If we cannot ensure the user exists up front, fall back to the portal invite
+    # flow for brand-new users instead of failing silently.
+    if ACCESS_API_BASE and not portal_user_ready:
         return {
             "actionLink": None,
             "deliveryMethod": "email",
