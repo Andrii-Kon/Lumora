@@ -15,12 +15,14 @@ const answers = (() => {
   }
 })()
 
-const isLocalHost =
-  typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-const portalApiBase =
-  (typeof window !== 'undefined' && window.LUMORA_PORTAL_API) ||
-  (isLocalHost ? 'http://localhost:5002' : 'https://idealist35.eu.pythonanywhere.com')
+const paymentsApiBase = (() => {
+  const runtimeValue =
+    typeof window !== 'undefined' && typeof window.LUMORA_PAYMENTS_API === 'string'
+      ? window.LUMORA_PAYMENTS_API
+      : ''
+  const configuredValue = runtimeValue || import.meta.env.VITE_PAYMENTS_API_BASE || ''
+  return configuredValue.replace(/\/+$/, '')
+})()
 
 const steps = {
   index: '/steps/index.html',
@@ -47,6 +49,35 @@ const steps = {
   'step-21': '/steps/step-21.html',
   'step-22': '/steps/step-22.html',
   'step-23': '/steps/step-23.html',
+}
+
+const buildApiUrl = (path) => {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return paymentsApiBase ? `${paymentsApiBase}${normalizedPath}` : normalizedPath
+}
+
+const getSearchParams = () =>
+  typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)
+
+const getInitialStepId = () => {
+  const stepId = getSearchParams().get('step')
+  return stepId && steps[stepId] ? stepId : 'index'
+}
+
+const getCheckoutState = () => {
+  const params = getSearchParams()
+  return {
+    status: params.get('checkout'),
+    sessionId: params.get('session_id'),
+  }
+}
+
+const clearCheckoutState = () => {
+  if (typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  url.searchParams.delete('checkout')
+  url.searchParams.delete('session_id')
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
 const reveal = (root) => {
@@ -252,7 +283,15 @@ const initFaqAccordion = (root) => {
 const initPaywall = (root) => {
   const payButtons = [...root.querySelectorAll('.pay-button')]
   if (!payButtons.length) return
+  const primaryButton = payButtons[0]
   const container = root.querySelector('.checkout-card') || root
+  const maskEmail = (value) => {
+    const email = String(value || '').trim()
+    const [localPart, domain] = email.split('@')
+    if (!localPart || !domain) return email
+    if (localPart.length <= 2) return `${localPart[0] || ''}***@${domain}`
+    return `${localPart.slice(0, 2)}***${localPart.slice(-1)}@${domain}`
+  }
   let status = container.querySelector('[data-pay-status]')
   if (!status) {
     status = document.createElement('div')
@@ -277,19 +316,19 @@ const initPaywall = (root) => {
     })
   }
 
-  const setProcessing = (button) => {
+  const setProcessing = (button, label = 'Redirecting...') => {
     payButtons.forEach((item) => {
       item.disabled = true
     })
     if (!button.dataset.originalText) {
       button.dataset.originalText = button.textContent
     }
-    button.textContent = 'Processing...'
+    button.textContent = label
     button.classList.add('is-processing')
   }
 
   const setPaid = (button, payload = {}) => {
-    const { actionLink, devPassword, devEmail } = payload
+    const { actionLink, deliveryMethod, portalEmail, portalUrl } = payload
     payButtons.forEach((item) => {
       item.disabled = true
       item.classList.remove('is-processing')
@@ -298,60 +337,69 @@ const initPaywall = (root) => {
     button.textContent = 'Paid'
     status.classList.remove('is-error')
     status.innerHTML = ''
-    if (devPassword) {
+    if (deliveryMethod === 'direct_link' && actionLink) {
       const label = document.createElement('div')
-      label.textContent = 'Dev mode: use these credentials'
-      const creds = document.createElement('div')
-      creds.className = 'dev-credentials'
-      const emailRow = document.createElement('div')
-      const emailLabel = document.createElement('span')
-      emailLabel.textContent = 'Email: '
-      const emailValue = document.createElement('code')
-      emailValue.textContent = devEmail || ''
-      emailRow.append(emailLabel, emailValue)
-      const passwordRow = document.createElement('div')
-      const passwordLabel = document.createElement('span')
-      passwordLabel.textContent = 'Password: '
-      const passwordValue = document.createElement('code')
-      passwordValue.textContent = devPassword
-      passwordRow.append(passwordLabel, passwordValue)
-      creds.append(emailRow, passwordRow)
-      status.append(label, creds)
-    } else if (actionLink) {
-      const label = document.createElement('div')
-      label.textContent = 'Dev mode: open your login link'
+      label.textContent = 'Your secure portal link is ready.'
+      const note = document.createElement('div')
+      note.className = 'access-details'
+      note.textContent = portalEmail
+        ? `Email: ${maskEmail(portalEmail)}`
+        : 'Use this one-time sign-in link to enter your portal.'
       const link = document.createElement('a')
       link.href = actionLink
-      link.textContent = 'Open magic link'
+      link.textContent = 'Open secure access link'
       link.target = '_blank'
       link.rel = 'noopener'
-      status.append(label, link)
+      status.append(label, note, link)
+    } else if (portalEmail) {
+      const label = document.createElement('div')
+      label.textContent = 'We sent your secure sign-in link.'
+      const emailLine = document.createElement('div')
+      emailLine.className = 'access-details'
+      const emailValue = document.createElement('code')
+      emailValue.textContent = maskEmail(portalEmail)
+      emailLine.append('Inbox: ', emailValue)
+      status.append(label, emailLine)
+      if (portalUrl) {
+        const hint = document.createElement('div')
+        hint.textContent = 'After opening the email, you will land in your private portal.'
+        const portalLink = document.createElement('a')
+        portalLink.href = portalUrl
+        portalLink.textContent = 'Open portal'
+        portalLink.target = '_blank'
+        portalLink.rel = 'noopener'
+        status.append(hint, portalLink)
+      }
     } else {
       status.textContent = 'Payment successful. Check your email for access.'
     }
     status.hidden = false
   }
 
-  const grantAccess = async () => {
+  const getQuizPayload = () => {
+    const quiz = { ...answers }
+    delete quiz.email
+    return quiz
+  }
+
+  const startCheckout = async () => {
     const email = answers.email?.trim?.() || ''
     if (!email) {
       return { ok: false, message: 'Please enter your email in the previous step.' }
     }
-    const quiz = { ...answers }
-    delete quiz.email
-    const payload = {
-      email,
-      quiz,
-      redirect_url: `${portalApiBase}/auth/callback`,
-    }
+
     try {
-      const response = await fetch(`${portalApiBase}/api/grant-access`, {
+      const response = await fetch(buildApiUrl('/api/stripe/create-checkout-session'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          email,
+          quiz: getQuizPayload(),
+        }),
       })
+
       if (!response.ok) {
-        let errorMessage = 'Unable to send access email.'
+        let errorMessage = 'Unable to start secure checkout.'
         try {
           const data = await response.json()
           if (data?.message) errorMessage = data.message
@@ -368,13 +416,91 @@ const initPaywall = (root) => {
       }
       return {
         ok: true,
-        actionLink: data.action_link,
-        devPassword: data.dev_password,
-        devEmail: data.dev_email,
+        url: data.url,
       }
     } catch (error) {
       return { ok: false, message: 'Network error. Please try again.' }
     }
+  }
+
+  const completeCheckout = async (sessionId) => {
+    try {
+      const response = await fetch(buildApiUrl('/api/stripe/complete-checkout'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          quiz: getQuizPayload(),
+        }),
+      })
+
+      if (!response.ok) {
+        let errorMessage = 'Unable to confirm your payment.'
+        try {
+          const data = await response.json()
+          if (data?.message) errorMessage = data.message
+        } catch {
+          // ignore parsing errors
+        }
+        return { ok: false, message: errorMessage }
+      }
+
+      let data = {}
+      try {
+        data = await response.json()
+      } catch {
+        data = {}
+      }
+
+      return {
+        ok: true,
+        actionLink: data.actionLink,
+        deliveryMethod: data.deliveryMethod,
+        portalEmail: data.portalEmail,
+        portalUrl: data.portalUrl,
+      }
+    } catch (error) {
+      return { ok: false, message: 'Network error. Please try again.' }
+    }
+  }
+
+  const restoreCheckoutState = async () => {
+    const { status: checkoutStatus, sessionId } = getCheckoutState()
+
+    if (checkoutStatus === 'cancel') {
+      resetButtons()
+      status.classList.remove('is-error')
+      status.textContent = 'Checkout canceled. Your sketch is still waiting for you.'
+      status.hidden = false
+      clearCheckoutState()
+      return
+    }
+
+    if (checkoutStatus !== 'success') return
+
+    if (!sessionId) {
+      resetButtons()
+      status.classList.add('is-error')
+      status.textContent = 'Missing Stripe session. Please try checkout again.'
+      status.hidden = false
+      clearCheckoutState()
+      return
+    }
+
+    setProcessing(primaryButton, 'Finishing checkout...')
+    status.hidden = true
+
+    const result = await completeCheckout(sessionId)
+    if (!result.ok) {
+      resetButtons()
+      status.classList.add('is-error')
+      status.textContent = result.message
+      status.hidden = false
+      return
+    }
+
+    setPaid(primaryButton, result)
+    clearCheckoutState()
   }
 
   payButtons.forEach((button) => {
@@ -386,19 +512,19 @@ const initPaywall = (root) => {
       resetButtons()
       status.classList.remove('is-error')
       setProcessing(button)
-      window.setTimeout(async () => {
-        const result = await grantAccess()
-        if (!result.ok) {
-          resetButtons()
-          status.classList.add('is-error')
-          status.textContent = result.message
-          status.hidden = false
-          return
-        }
-        setPaid(button, result)
-      }, 1400)
+      const result = await startCheckout()
+      if (!result.ok || !result.url) {
+        resetButtons()
+        status.classList.add('is-error')
+        status.textContent = result.message || 'Unable to start secure checkout.'
+        status.hidden = false
+        return
+      }
+      window.location.assign(result.url)
     })
   })
+
+  restoreCheckoutState()
 }
 
 const initFlow = (root) => {
@@ -678,4 +804,4 @@ const loadStep = async (stepId) => {
   }
 }
 
-loadStep('index')
+loadStep(getInitialStepId())

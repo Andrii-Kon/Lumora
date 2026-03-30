@@ -24,3 +24,6 @@ dist-ssr
 .env
 node_modules/
 .DS_Store
+.venv/
+__pycache__/
+*.pyc

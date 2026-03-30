@@ -1307,18 +1307,16 @@ main {
   color: #ffffff;
 }
 
-.pay-button--paypal {
-  background: #f9c74f;
-}
-
-.pay-button--gpay {
-  background: #111111;
-  color: #ffffff;
-}
-
-.pay-button--card {
+.pay-button--checkout {
   background: #0a6ed1;
   color: #ffffff;
+}
+
+.pay-hint {
+  margin: 4px 0 0;
+  color: rgba(26, 26, 31, 0.68);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .pay-status {
@@ -1331,7 +1329,7 @@ main {
   text-align: center;
 }
 
-.pay-status .dev-credentials {
+.pay-status .access-details {
   margin-top: 8px;
   display: grid;
   gap: 6px;
