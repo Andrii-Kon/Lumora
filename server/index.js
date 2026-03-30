@@ -302,8 +302,9 @@ async function fulfillCheckoutSession(sessionId, fallbackQuiz = {}) {
     const draft = checkoutDrafts.get(sessionId)
     const quiz =
       Object.keys(fallbackQuiz || {}).length > 0 ? fallbackQuiz : sanitizeQuiz(draft?.quiz || {})
+    const userExistedBeforeHandoff = await portalUserExists(email)
     await handoffPortalAccess(email, quiz)
-    const portalAccess = await sendPortalMagicLink(email)
+    const portalAccess = await resolvePortalAccess(email, userExistedBeforeHandoff)
 
     const result = {
       actionLink: portalAccess.actionLink,
@@ -364,6 +365,68 @@ async function handoffPortalAccess(email, quiz) {
   }
 
   return data
+}
+
+async function resolvePortalAccess(email, userExistedBeforeHandoff) {
+  // The external portal sends an invite email for first-time users.
+  // Sending another Lumora magic link right after that invalidates the first OTP.
+  if (accessApiBase && !userExistedBeforeHandoff) {
+    return {
+      actionLink: null,
+      deliveryMethod: 'email',
+      portalUrl: portalEntryUrl,
+    }
+  }
+
+  return sendPortalMagicLink(email)
+}
+
+async function portalUserExists(email) {
+  if (!supabaseUrl || !serviceRoleKey || !email) {
+    return false
+  }
+
+  const target = String(email).trim().toLowerCase()
+  let page = 1
+
+  while (true) {
+    const url = new URL(`${supabaseUrl}/auth/v1/admin/users`)
+    url.searchParams.set('page', String(page))
+    url.searchParams.set('per_page', '1000')
+
+    const response = await fetch(url, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+    })
+
+    if (!response.ok) {
+      return false
+    }
+
+    let payload = {}
+    try {
+      payload = await response.json()
+    } catch {
+      payload = {}
+    }
+
+    const users = Array.isArray(payload?.users) ? payload.users : Array.isArray(payload) ? payload : []
+    if (!users.length) {
+      return false
+    }
+
+    if (users.some((user) => String(user?.email || '').trim().toLowerCase() === target)) {
+      return true
+    }
+
+    if (users.length < 1000) {
+      return false
+    }
+
+    page += 1
+  }
 }
 
 async function sendPortalMagicLink(email) {

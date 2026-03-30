@@ -351,8 +351,9 @@ def _fulfill_checkout_session(session_id: str, fallback_quiz: dict | None = None
 
         draft = checkout_drafts.get(session_id, {})
         quiz = fallback_quiz or _sanitize_quiz(draft.get("quiz"))
+        user_existed_before_handoff = _portal_user_exists(email)
         _handoff_portal_access(email, quiz)
-        portal_access = _send_portal_magic_link(email)
+        portal_access = _resolve_portal_access(email, user_existed_before_handoff)
 
         result = {
             "actionLink": portal_access["actionLink"],
@@ -401,6 +402,57 @@ def _handoff_portal_access(email: str, quiz: dict):
         raise error
 
     return data
+
+
+def _resolve_portal_access(email: str, user_existed_before_handoff: bool) -> dict:
+    # The external portal handoff sends an invite email for brand-new users.
+    # Avoid sending a second magic-link email here, because Supabase invalidates
+    # the earlier OTP and the user lands on an expired-link error page.
+    if ACCESS_API_BASE and not user_existed_before_handoff:
+        return {
+            "actionLink": None,
+            "deliveryMethod": "email",
+            "portalUrl": PORTAL_ENTRY_URL,
+        }
+    return _send_portal_magic_link(email)
+
+
+def _portal_user_exists(email: str) -> bool:
+    if not SUPABASE_URL or not SERVICE_ROLE_KEY or not email:
+        return False
+
+    base = SUPABASE_URL.rstrip("/")
+    page = 1
+    target = email.strip().lower()
+
+    while True:
+        response = requests.get(
+            f"{base}/auth/v1/admin/users",
+            headers={
+                "apikey": SERVICE_ROLE_KEY,
+                "Authorization": f"Bearer {SERVICE_ROLE_KEY}",
+            },
+            params={"page": page, "per_page": 1000},
+            timeout=20,
+        )
+
+        if response.status_code != 200:
+            return False
+
+        payload = response.json() if response.content else {}
+        users = payload.get("users") if isinstance(payload, dict) else payload
+        if not isinstance(users, list) or not users:
+            return False
+
+        for user in users:
+            candidate = str((user or {}).get("email") or "").strip().lower()
+            if candidate == target:
+                return True
+
+        if len(users) < 1000:
+            return False
+
+        page += 1
 
 
 def _send_portal_magic_link(email: str) -> dict:
